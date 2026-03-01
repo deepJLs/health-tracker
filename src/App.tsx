@@ -1037,10 +1037,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-amber-500/30">
-      <div className="w-full md:max-w-md mx-auto min-h-screen flex flex-col relative md:border-x border-zinc-200 dark:border-zinc-800">
+      <div className="w-full md:max-w-md mx-auto relative md:border-x border-zinc-200 dark:border-zinc-800">
         {view !== 'login' && view !== 'register' && renderHeader()}
 
-        <main className="flex-1 overflow-x-hidden">
+        <main className="overflow-x-hidden">
           <AnimatePresence mode="wait">
             {view === 'login' && <LoginView key="login" onLogin={handleLogin} onGoToRegister={() => setView('register')} loading={loading} />}
             {view === 'register' && <RegisterView key="register" onRegister={handleRegister} onGoToLogin={() => setView('login')} loading={loading} />}
