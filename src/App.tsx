@@ -141,7 +141,7 @@ const BottomNav = ({ activeView, setView }: { activeView: View, setView: (v: Vie
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pb-safe-area z-50">
-      <div className="max-w-md mx-auto flex justify-around py-2 px-4">
+      <div className="w-full md:max-w-md mx-auto flex justify-around py-2 px-4">
         {navItems.map((item) => (
           <button
             key={item.id}
@@ -162,7 +162,7 @@ const BottomNav = ({ activeView, setView }: { activeView: View, setView: (v: Vie
 
 const Header = ({ title, leftAction, rightAction }: { title: string, leftAction?: React.ReactNode, rightAction?: React.ReactNode }) => (
   <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
-    <div className="max-w-md mx-auto flex items-center justify-between px-4 h-14">
+    <div className="w-full md:max-w-md mx-auto flex items-center justify-between px-4 h-14">
       <div className="w-10 flex items-center justify-start">{leftAction}</div>
       <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{title}</h1>
       <div className="w-10 flex items-center justify-end">{rightAction}</div>
@@ -1037,7 +1037,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-amber-500/30">
-      <div className="max-w-md mx-auto min-h-screen flex flex-col relative border-x border-zinc-200 dark:border-zinc-800">
+      <div className="w-full md:max-w-md mx-auto min-h-screen flex flex-col relative md:border-x border-zinc-200 dark:border-zinc-800">
         {view !== 'login' && view !== 'register' && renderHeader()}
 
         <main className="flex-1 overflow-x-hidden">
