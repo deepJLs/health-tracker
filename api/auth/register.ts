@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'crypto';
-import { supabase } from '../_lib/supabaseClient';
+import { supabase } from '../_lib/supabaseClient.js';
 
 function hashPassword(password: string): string {
     return crypto.createHash('sha256').update(password).digest('hex');
