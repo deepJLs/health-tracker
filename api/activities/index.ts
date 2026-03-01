@@ -2,9 +2,16 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../_lib/supabaseClient';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method === 'GET') {
-        // GET /api/activities?user_id=xxx
-        try {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    try {
+        if (req.method === 'GET') {
             const { user_id } = req.query;
             if (!user_id) {
                 return res.status(400).json({ error: '缺少 user_id 参数' });
@@ -22,14 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             return res.status(200).json({ activities: data || [] });
-        } catch (err) {
-            console.error('获取活动错误:', err);
-            return res.status(500).json({ error: '服务器内部错误' });
-        }
-    } else if (req.method === 'POST') {
-        // POST /api/activities
-        try {
-            const { user_id, type, time, title, detail, timestamp } = req.body;
+        } else if (req.method === 'POST') {
+            const { user_id, type, time, title, detail, timestamp } = req.body || {};
 
             if (!user_id || !type || !time || !title || !detail || !timestamp) {
                 return res.status(400).json({ error: '缺少必要参数' });
@@ -47,11 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             return res.status(200).json({ activity: data });
-        } catch (err) {
-            console.error('创建活动错误:', err);
-            return res.status(500).json({ error: '服务器内部错误' });
+        } else {
+            return res.status(405).json({ error: '不支持的请求方法' });
         }
-    } else {
-        return res.status(405).json({ error: '不支持的请求方法' });
+    } catch (err: any) {
+        console.error('活动API错误:', err);
+        return res.status(500).json({ error: '服务器内部错误: ' + (err.message || '') });
     }
 }

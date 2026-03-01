@@ -7,12 +7,21 @@ function hashPassword(password: string): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // 设置 CORS 头
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: '仅支持 POST 请求' });
     }
 
     try {
-        const { email, password } = req.body;
+        const { email, password } = req.body || {};
         if (!email || !password) {
             return res.status(400).json({ error: '请输入邮箱和密码' });
         }
@@ -38,8 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { password_hash, ...safeUser } = existingUser;
         return res.status(200).json({ user: safeUser });
-    } catch (err) {
+    } catch (err: any) {
         console.error('登录错误:', err);
-        return res.status(500).json({ error: '服务器内部错误' });
+        return res.status(500).json({ error: '服务器内部错误: ' + (err.message || '') });
     }
 }
