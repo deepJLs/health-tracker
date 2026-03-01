@@ -1,0 +1,27 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { supabase } from '../_lib/supabaseClient';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method !== 'DELETE') {
+        return res.status(405).json({ error: '仅支持 DELETE 请求' });
+    }
+
+    try {
+        const { id } = req.query;
+
+        const { error } = await supabase
+            .from('activities')
+            .delete()
+            .eq('id', id as string);
+
+        if (error) {
+            console.error('删除活动记录失败:', error);
+            return res.status(500).json({ error: '删除活动记录失败' });
+        }
+
+        return res.status(200).json({ success: true });
+    } catch (err) {
+        console.error('删除活动错误:', err);
+        return res.status(500).json({ error: '服务器内部错误' });
+    }
+}
