@@ -191,7 +191,7 @@ const HomeView = ({
   key?: string
 }) => {
   const lastBowel = activities.find(a => a.type === 'bowel');
-  const [timeSince, setTimeSince] = useState('0分钟');
+  const [timeSince, setTimeSince] = useState('暂无记录');
   const [bowelType, setBowelType] = useState('软硬适中');
 
   React.useEffect(() => {
@@ -205,10 +205,15 @@ const HomeView = ({
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-      if (hours > 0) {
-        setTimeSince(`${hours}小时 ${minutes}分`);
+      if (hours >= 24) {
+        const days = Math.floor(hours / 24);
+        setTimeSince(`${days}天 ${hours % 24}小时`);
+      } else if (hours > 0) {
+        setTimeSince(`${hours}小时 ${minutes}分钟`);
+      } else if (minutes > 0) {
+        setTimeSince(`${minutes}分钟`);
       } else {
-        setTimeSince(`${minutes}分`);
+        setTimeSince('刚刚');
       }
     };
 
@@ -226,7 +231,7 @@ const HomeView = ({
     >
       {/* Last Event Card */}
       <div className="bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">距离上次如厕时间</p>
+        <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">距离上次如厕时间间隔</p>
         <div className="flex items-baseline gap-2 mt-1">
           <p className="text-zinc-900 dark:text-zinc-100 text-3xl font-bold">{timeSince}</p>
           <span className="text-amber-500 text-sm font-semibold">正常范围</span>
