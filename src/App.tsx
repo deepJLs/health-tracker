@@ -536,7 +536,7 @@ const AnalysisView = ({ stats, tab, activities, key }: {
       <h3 className="text-zinc-900 dark:text-zinc-100 text-sm font-bold mb-6">{label}</h3>
       <div className="h-48 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: xInterval !== undefined ? 0 : -20, bottom: 0 }}>
             <XAxis
               dataKey="name"
               axisLine={false}
