@@ -451,7 +451,7 @@ const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Ac
   );
 };
 
-const AnalysisView = ({ stats, key }: {
+const AnalysisView = ({ stats, tab, activities, key }: {
   stats: {
     avgBowel: string,
     avgInterval: string,
@@ -460,8 +460,117 @@ const AnalysisView = ({ stats, key }: {
     weeklyData: { name: string, value: number }[],
     healthAdvice: string
   },
+  tab: '日' | '周' | '月',
+  activities: Activity[],
   key?: string
 }) => {
+  // Compute daily stats (today)
+  const dailyStats = React.useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+    const todayActivities = activities.filter(a => a.timestamp >= startOfToday);
+    const todayBowel = todayActivities.filter(a => a.type === 'bowel');
+    const todayWater = todayActivities.filter(a => a.type === 'water');
+
+    const todayWaterMl = todayWater.reduce((sum, a) => {
+      const match = a.detail.match(/\d+/);
+      return sum + (match ? parseInt(match[0]) : 0);
+    }, 0);
+
+    // Hourly distribution for today (0-23)
+    const hourlyData = Array.from({ length: 24 }, (_, h) => {
+      const count = todayBowel.filter(a => new Date(a.timestamp).getHours() === h).length;
+      return { name: `${h}`, value: count };
+    });
+
+    return {
+      bowelCount: todayBowel.length,
+      waterMl: todayWaterMl,
+      hourlyData,
+    };
+  }, [activities]);
+
+  // Compute weekly stats (this week, Mon-Sun)
+  const weeklyStats = React.useMemo(() => {
+    const now = new Date();
+    const dow = now.getDay(); // 0=Sun
+    const mondayOffset = dow === 0 ? 6 : dow - 1;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const weekActivities = activities.filter(a => a.timestamp >= weekStart.getTime() && a.timestamp <= weekEnd.getTime());
+    const weekBowel = weekActivities.filter(a => a.type === 'bowel');
+    const weekWater = weekActivities.filter(a => a.type === 'water');
+
+    const weekWaterMl = weekWater.reduce((sum, a) => {
+      const match = a.detail.match(/\d+/);
+      return sum + (match ? parseInt(match[0]) : 0);
+    }, 0);
+
+    const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const dailyData = dayLabels.map((label, idx) => {
+      const dayDate = new Date(weekStart);
+      dayDate.setDate(weekStart.getDate() + idx);
+      const dateStr = dayDate.toDateString();
+      const count = weekBowel.filter(a => new Date(a.timestamp).toDateString() === dateStr).length;
+      return { name: label, value: count };
+    });
+
+    const activeDays = dailyData.filter(d => d.value > 0).length;
+
+    return {
+      bowelCount: weekBowel.length,
+      waterMl: weekWaterMl,
+      dailyAvg: activeDays > 0 ? (weekBowel.length / activeDays).toFixed(1) : '0',
+      dailyData,
+    };
+  }, [activities]);
+
+  const renderChart = (data: { name: string, value: number }[], label: string) => (
+    <div className="bg-zinc-100 dark:bg-zinc-900/50 p-5 rounded-2xl">
+      <h3 className="text-zinc-900 dark:text-zinc-100 text-sm font-bold mb-6">{label}</h3>
+      <div className="h-48 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }}
+              dy={10}
+            />
+            <Tooltip
+              cursor={{ fill: 'transparent' }}
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <div className="bg-zinc-900 text-white px-2 py-1 rounded text-[10px] font-bold">
+                      {payload[0].value}次
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.value > 0 ? '#f59e0b' : '#e2e8f0'}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
@@ -469,123 +578,138 @@ const AnalysisView = ({ stats, key }: {
       exit={{ opacity: 0, scale: 0.98 }}
       className="flex flex-col gap-6 p-4 pb-24"
     >
-      <div className="flex items-center justify-between">
-        <h2 className="text-zinc-900 dark:text-zinc-100 text-xl font-bold">频率热度图</h2>
-        <Info size={16} className="text-zinc-400" />
-      </div>
+      {/* ===== 日 Tab ===== */}
+      {tab === '日' && (
+        <>
+          <h2 className="text-zinc-900 dark:text-zinc-100 text-xl font-bold">今日概览</h2>
 
-      {/* Calendar Heatmap */}
-      <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <button className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
-            <ChevronLeft size={20} />
-          </button>
-          <p className="text-zinc-900 dark:text-zinc-100 font-bold">最近 28 天</p>
-          <button className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-y-2 text-center mb-4">
-          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-            <div key={day} className="text-[11px] font-bold text-zinc-400 h-8 flex items-center justify-center">{day}</div>
-          ))}
-          {stats.heatmapData.map((item) => {
-            const day = item.day;
-            const intensity = item.intensity;
-
-            return (
-              <div key={day} className="h-10 flex items-center justify-center">
-                {intensity > 0 ? (
-                  <div className={cn(
-                    "size-8 flex items-center justify-center rounded-full font-bold text-sm transition-all",
-                    intensity === 1 && "bg-amber-500/20 text-zinc-900 dark:text-zinc-100",
-                    intensity === 2 && "bg-amber-500/40 text-zinc-900 dark:text-zinc-100",
-                    intensity === 3 && "bg-amber-500/60 text-zinc-900 dark:text-zinc-100",
-                    intensity === 4 && "bg-amber-500 text-white shadow-sm"
-                  )}>
-                    {day}
-                  </div>
-                ) : (
-                  <span className="text-zinc-400 text-sm">{day}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-          <p className="text-[10px] text-zinc-400 font-bold">较少</p>
-          <div className="flex gap-1">
-            <div className="size-3 rounded-sm bg-zinc-200 dark:bg-zinc-800" />
-            <div className="size-3 rounded-sm bg-amber-500/30" />
-            <div className="size-3 rounded-sm bg-amber-500/60" />
-            <div className="size-3 rounded-sm bg-amber-500" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">今日如厕</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{dailyStats.bowelCount}次</p>
+            </div>
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">今日饮水</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{(dailyStats.waterMl / 1000).toFixed(1)}升</p>
+            </div>
           </div>
-          <p className="text-[10px] text-zinc-400 font-bold">较多</p>
-        </div>
-      </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
-          <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">平均间隔</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.avgInterval}h</p>
-          <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold mt-1">
-            <TrendingDown size={12} />
-            <span>状态稳定</span>
-          </div>
-        </div>
-        <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
-          <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">月度总计</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.monthlyTotal}次</p>
-          <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
-            <Minus size={12} />
-            <span>状态稳定</span>
-          </div>
-        </div>
-      </div>
+          {renderChart(dailyStats.hourlyData, '24小时分布')}
+        </>
+      )}
 
-      {/* Weekly Chart */}
-      <div className="bg-zinc-100 dark:bg-zinc-900/50 p-5 rounded-2xl">
-        <h3 className="text-zinc-900 dark:text-zinc-100 text-sm font-bold mb-6">每周总次数</h3>
-        <div className="h-48 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stats.weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }}
-                dy={10}
-              />
-              <Tooltip
-                cursor={{ fill: 'transparent' }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-zinc-900 text-white px-2 py-1 rounded text-[10px] font-bold">
-                        {payload[0].value}
+      {/* ===== 周 Tab ===== */}
+      {tab === '周' && (
+        <>
+          <h2 className="text-zinc-900 dark:text-zinc-100 text-xl font-bold">本周概览</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">本周如厕</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{weeklyStats.bowelCount}次</p>
+            </div>
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">日均次数</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{weeklyStats.dailyAvg}次</p>
+            </div>
+          </div>
+
+          {renderChart(weeklyStats.dailyData, '本周每日次数')}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">本周饮水</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{(weeklyStats.waterMl / 1000).toFixed(1)}升</p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ===== 月 Tab ===== */}
+      {tab === '月' && (
+        <>
+          <div className="flex items-center justify-between">
+            <h2 className="text-zinc-900 dark:text-zinc-100 text-xl font-bold">频率热度图</h2>
+            <Info size={16} className="text-zinc-400" />
+          </div>
+
+          {/* Calendar Heatmap */}
+          <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <button className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                <ChevronLeft size={20} />
+              </button>
+              <p className="text-zinc-900 dark:text-zinc-100 font-bold">最近 28 天</p>
+              <button className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-y-2 text-center mb-4">
+              {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+                <div key={day} className="text-[11px] font-bold text-zinc-400 h-8 flex items-center justify-center">{day}</div>
+              ))}
+              {stats.heatmapData.map((item) => {
+                const day = item.day;
+                const intensity = item.intensity;
+
+                return (
+                  <div key={day} className="h-10 flex items-center justify-center">
+                    {intensity > 0 ? (
+                      <div className={cn(
+                        "size-8 flex items-center justify-center rounded-full font-bold text-sm transition-all",
+                        intensity === 1 && "bg-amber-500/20 text-zinc-900 dark:text-zinc-100",
+                        intensity === 2 && "bg-amber-500/40 text-zinc-900 dark:text-zinc-100",
+                        intensity === 3 && "bg-amber-500/60 text-zinc-900 dark:text-zinc-100",
+                        intensity === 4 && "bg-amber-500 text-white shadow-sm"
+                      )}>
+                        {day}
                       </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                {stats.weeklyData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.value > 0 ? '#f59e0b' : '#e2e8f0'}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+                    ) : (
+                      <span className="text-zinc-400 text-sm">{day}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-      {/* Health Suggestions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <p className="text-[10px] text-zinc-400 font-bold">较少</p>
+              <div className="flex gap-1">
+                <div className="size-3 rounded-sm bg-zinc-200 dark:bg-zinc-800" />
+                <div className="size-3 rounded-sm bg-amber-500/30" />
+                <div className="size-3 rounded-sm bg-amber-500/60" />
+                <div className="size-3 rounded-sm bg-amber-500" />
+              </div>
+              <p className="text-[10px] text-zinc-400 font-bold">较多</p>
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">平均间隔</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.avgInterval}h</p>
+              <div className="flex items-center gap-1 text-emerald-500 text-xs font-bold mt-1">
+                <TrendingDown size={12} />
+                <span>状态稳定</span>
+              </div>
+            </div>
+            <div className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl flex flex-col gap-1">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">月度总计</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.monthlyTotal}次</p>
+              <div className="flex items-center gap-1 text-amber-500 text-xs font-bold mt-1">
+                <Minus size={12} />
+                <span>状态稳定</span>
+              </div>
+            </div>
+          </div>
+
+          {renderChart(stats.weeklyData, '每周总次数')}
+        </>
+      )}
+
+      {/* Health Suggestions (always shown) */}
       <section className="pb-4">
         <h3 className="text-zinc-900 dark:text-zinc-100 text-sm font-bold mb-3">健康建议</h3>
         <div className="flex flex-col gap-3">
@@ -815,6 +939,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWaterModal, setShowWaterModal] = useState(false);
+  const [analysisTab, setAnalysisTab] = useState<'日' | '周' | '月'>('月');
 
   // Load activities from API when user changes
   const loadActivities = useCallback(async (userId: string) => {
@@ -1028,15 +1153,16 @@ export default function App() {
       case 'analysis':
         return (
           <div className="sticky top-0 z-40 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-            <Header title="月度健康分析" leftAction={<ChevronLeft size={24} />} rightAction={<Share2 size={24} />} />
+            <Header title="健康分析" />
             <div className="max-w-md mx-auto px-4">
               <div className="flex justify-between gap-8">
-                {['日', '周', '月'].map(tab => (
+                {(['日', '周', '月'] as const).map(tab => (
                   <button
                     key={tab}
+                    onClick={() => setAnalysisTab(tab)}
                     className={cn(
                       "flex-1 py-3 border-b-2 font-bold text-sm transition-colors",
-                      tab === '月' ? "border-amber-500 text-amber-500" : "border-transparent text-zinc-500"
+                      analysisTab === tab ? "border-amber-500 text-amber-500" : "border-transparent text-zinc-500"
                     )}
                   >
                     {tab}
@@ -1073,7 +1199,7 @@ export default function App() {
               />
             )}
             {view === 'records' && <RecordsView key="records" activities={activities} heatmapData={stats.heatmapData} loading={loading} />}
-            {view === 'analysis' && <AnalysisView key="analysis" stats={stats} />}
+            {view === 'analysis' && <AnalysisView key={`analysis-${analysisTab}`} stats={stats} tab={analysisTab} activities={activities} />}
             {view === 'profile' && user && <ProfileView key="profile" user={user} onLogout={handleLogout} />}
           </AnimatePresence>
         </main>
