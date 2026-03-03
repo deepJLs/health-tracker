@@ -407,11 +407,12 @@ const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Ac
                 key={item.day}
                 className={cn(
                   "aspect-square rounded-sm transition-colors",
-                  item.intensity === 0 ? "bg-zinc-200 dark:bg-zinc-800" :
-                    item.intensity === 1 ? "bg-amber-500/20" :
-                      item.intensity === 2 ? "bg-amber-500/40" :
-                        item.intensity === 3 ? "bg-amber-500/70" :
-                          "bg-amber-500 rounded-full border-2 border-white dark:border-zinc-900"
+                  item.intensity === -1 ? "bg-transparent" :
+                    item.intensity === 0 ? "bg-zinc-200 dark:bg-zinc-800" :
+                      item.intensity === 1 ? "bg-amber-500/20" :
+                        item.intensity === 2 ? "bg-amber-500/40" :
+                          item.intensity === 3 ? "bg-amber-500/70" :
+                            "bg-amber-500 rounded-full border-2 border-white dark:border-zinc-900"
                 )}
               />
             ))}
@@ -931,17 +932,32 @@ export default function App() {
       return { name: `第${i + 1}周`, value: count };
     });
 
-    // Heatmap data for last 28 days
-    const heatmapData = Array.from({ length: 28 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (27 - i));
-      const dateStr = date.toDateString();
-      const count = bowelActivities.filter(a => new Date(a.timestamp).toDateString() === dateStr).length;
-      return {
-        day: i + 1,
-        intensity: Math.min(count, 4)
-      };
-    });
+    // Heatmap data for last 28 days, aligned to weekdays (Mon=0 ... Sun=6)
+    const heatmapEntries: { day: number; intensity: number }[] = [];
+    const today = new Date();
+    // Find the Monday of the week that is 3 weeks ago (4 weeks total including this week)
+    const todayDow = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const todayMondayOffset = todayDow === 0 ? 6 : todayDow - 1; // days since Monday
+    const gridStartDate = new Date(today);
+    gridStartDate.setDate(today.getDate() - todayMondayOffset - 21); // Monday 3 weeks ago
+    gridStartDate.setHours(0, 0, 0, 0);
+
+    // The grid always has 4 complete rows (28 cells)
+    // But days after today should be empty (intensity = -1)
+    const todayStr = today.toDateString();
+    for (let i = 0; i < 28; i++) {
+      const cellDate = new Date(gridStartDate);
+      cellDate.setDate(gridStartDate.getDate() + i);
+      if (cellDate > today && cellDate.toDateString() !== todayStr) {
+        // Future date: show as empty/invisible
+        heatmapEntries.push({ day: i, intensity: -1 });
+      } else {
+        const dateStr = cellDate.toDateString();
+        const count = bowelActivities.filter(a => new Date(a.timestamp).toDateString() === dateStr).length;
+        heatmapEntries.push({ day: i, intensity: Math.min(count, 4) });
+      }
+    }
+    const heatmapData = heatmapEntries;
 
     // Health Advice
     let healthAdvice = "您的排便规律性良好。建议保持充足的饮水量和纤维摄入。";
