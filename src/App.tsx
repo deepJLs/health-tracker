@@ -457,6 +457,7 @@ const AnalysisView = ({ stats, tab, activities, key }: {
     avgInterval: string,
     monthlyTotal: number,
     heatmapData: { day: number, intensity: number }[],
+    analysisHeatmapData: { day: number, intensity: number, dateNum: number }[],
     weeklyData: { name: string, value: number }[],
     healthAdvice: string
   },
@@ -650,13 +651,15 @@ const AnalysisView = ({ stats, tab, activities, key }: {
               {['日', '一', '二', '三', '四', '五', '六'].map(day => (
                 <div key={day} className="text-[11px] font-bold text-zinc-400 h-8 flex items-center justify-center">{day}</div>
               ))}
-              {stats.heatmapData.map((item) => {
-                const day = item.day;
+              {stats.analysisHeatmapData.map((item) => {
+                const dateNum = item.dateNum;
                 const intensity = item.intensity;
 
                 return (
-                  <div key={day} className="h-10 flex items-center justify-center">
-                    {intensity > 0 ? (
+                  <div key={item.day} className="h-10 flex items-center justify-center">
+                    {intensity === -1 ? (
+                      <span></span>
+                    ) : intensity > 0 ? (
                       <div className={cn(
                         "size-8 flex items-center justify-center rounded-full font-bold text-sm transition-all",
                         intensity === 1 && "bg-amber-500/20 text-zinc-900 dark:text-zinc-100",
@@ -664,10 +667,10 @@ const AnalysisView = ({ stats, tab, activities, key }: {
                         intensity === 3 && "bg-amber-500/60 text-zinc-900 dark:text-zinc-100",
                         intensity === 4 && "bg-amber-500 text-white shadow-sm"
                       )}>
-                        {day}
+                        {dateNum}
                       </div>
                     ) : (
-                      <span className="text-zinc-400 text-sm">{day}</span>
+                      <span className="text-zinc-400 text-sm">{dateNum}</span>
                     )}
                   </div>
                 );
@@ -1045,45 +1048,69 @@ export default function App() {
       avgInterval = (avgMs / (1000 * 60 * 60)).toFixed(1);
     }
 
-    // Weekly Data (Last 5 weeks)
-    const weeklyData = Array.from({ length: 5 }, (_, i) => {
-      const weekEnd = new Date();
-      weekEnd.setDate(weekEnd.getDate() - (4 - i) * 7);
-      const weekStart = new Date(weekEnd);
-      weekStart.setDate(weekStart.getDate() - 6);
-      weekStart.setHours(0, 0, 0, 0);
-      weekEnd.setHours(23, 59, 59, 999);
+    // Weekly Data (Last 5 weeks, Mon-Sun aligned)
+    const weeklyData = (() => {
+      const now = new Date();
+      const nowDow = now.getDay();
+      const nowMondayOffset = nowDow === 0 ? 6 : nowDow - 1;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() - nowMondayOffset);
+      thisMonday.setHours(0, 0, 0, 0);
 
-      const count = bowelActivities.filter(a => a.timestamp >= weekStart.getTime() && a.timestamp <= weekEnd.getTime()).length;
-      return { name: `第${i + 1}周`, value: count };
-    });
+      return Array.from({ length: 5 }, (_, i) => {
+        const weekStart = new Date(thisMonday);
+        weekStart.setDate(thisMonday.getDate() - (4 - i) * 7);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
 
-    // Heatmap data for last 28 days, aligned to weekdays (Mon=0 ... Sun=6)
-    const heatmapEntries: { day: number; intensity: number }[] = [];
+        const count = bowelActivities.filter(a => a.timestamp >= weekStart.getTime() && a.timestamp <= weekEnd.getTime()).length;
+        return { name: `第${i + 1}周`, value: count };
+      });
+    })();
+
+    // Heatmap data for AnalysisView (Sun-first calendar, last 28 days)
+    // Grid columns: 日 一 二 三 四 五 六
+    const analysisHeatmapData: { day: number; intensity: number; dateNum: number }[] = [];
     const today = new Date();
-    // Find the Monday of the week that is 3 weeks ago (4 weeks total including this week)
+    // Find the Sunday that starts the grid (4 weeks ago)
     const todayDow = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const todayMondayOffset = todayDow === 0 ? 6 : todayDow - 1; // days since Monday
     const gridStartDate = new Date(today);
-    gridStartDate.setDate(today.getDate() - todayMondayOffset - 21); // Monday 3 weeks ago
+    gridStartDate.setDate(today.getDate() - todayDow - 21); // Sunday 3 weeks ago
     gridStartDate.setHours(0, 0, 0, 0);
 
-    // The grid always has 4 complete rows (28 cells)
-    // But days after today should be empty (intensity = -1)
     const todayStr = today.toDateString();
     for (let i = 0; i < 28; i++) {
       const cellDate = new Date(gridStartDate);
       cellDate.setDate(gridStartDate.getDate() + i);
+      const dateNum = cellDate.getDate();
       if (cellDate > today && cellDate.toDateString() !== todayStr) {
-        // Future date: show as empty/invisible
-        heatmapEntries.push({ day: i, intensity: -1 });
+        analysisHeatmapData.push({ day: i, intensity: -1, dateNum });
       } else {
         const dateStr = cellDate.toDateString();
         const count = bowelActivities.filter(a => new Date(a.timestamp).toDateString() === dateStr).length;
-        heatmapEntries.push({ day: i, intensity: Math.min(count, 4) });
+        analysisHeatmapData.push({ day: i, intensity: Math.min(count, 4), dateNum });
       }
     }
-    const heatmapData = heatmapEntries;
+
+    // Heatmap data for RecordsView (Mon-first, last 28 days)
+    const recordsHeatmapData: { day: number; intensity: number }[] = [];
+    const recordsMondayOffset = todayDow === 0 ? 6 : todayDow - 1;
+    const recordsGridStart = new Date(today);
+    recordsGridStart.setDate(today.getDate() - recordsMondayOffset - 21);
+    recordsGridStart.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 28; i++) {
+      const cellDate = new Date(recordsGridStart);
+      cellDate.setDate(recordsGridStart.getDate() + i);
+      if (cellDate > today && cellDate.toDateString() !== todayStr) {
+        recordsHeatmapData.push({ day: i, intensity: -1 });
+      } else {
+        const dateStr = cellDate.toDateString();
+        const count = bowelActivities.filter(a => new Date(a.timestamp).toDateString() === dateStr).length;
+        recordsHeatmapData.push({ day: i, intensity: Math.min(count, 4) });
+      }
+    }
 
     // Health Advice
     let healthAdvice = "您的排便规律性良好。建议保持充足的饮水量和纤维摄入。";
@@ -1098,7 +1125,8 @@ export default function App() {
       avgInterval,
       todayWater: (todayWaterMl / 1000).toFixed(1),
       monthlyTotal: bowelActivities.length,
-      heatmapData,
+      heatmapData: recordsHeatmapData,
+      analysisHeatmapData,
       weeklyData,
       healthAdvice
     };
