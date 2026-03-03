@@ -531,7 +531,7 @@ const AnalysisView = ({ stats, tab, activities, key }: {
     };
   }, [activities]);
 
-  const renderChart = (data: { name: string, value: number }[], label: string) => (
+  const renderChart = (data: { name: string, value: number }[], label: string, xInterval?: number) => (
     <div className="bg-zinc-100 dark:bg-zinc-900/50 p-5 rounded-2xl">
       <h3 className="text-zinc-900 dark:text-zinc-100 text-sm font-bold mb-6">{label}</h3>
       <div className="h-48 w-full">
@@ -541,8 +541,9 @@ const AnalysisView = ({ stats, tab, activities, key }: {
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }}
+              tick={{ fontSize: xInterval !== undefined ? 8 : 10, fill: '#94a3b8', fontWeight: 700 }}
               dy={10}
+              interval={xInterval !== undefined ? xInterval : 'preserveStartEnd'}
             />
             <Tooltip
               cursor={{ fill: 'transparent' }}
@@ -594,7 +595,7 @@ const AnalysisView = ({ stats, tab, activities, key }: {
             </div>
           </div>
 
-          {renderChart(dailyStats.hourlyData, '24小时分布')}
+          {renderChart(dailyStats.hourlyData, '24小时分布', 0)}
         </>
       )}
 
