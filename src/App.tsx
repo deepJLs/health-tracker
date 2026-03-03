@@ -1018,7 +1018,7 @@ export default function App() {
   const renderHeader = () => {
     switch (view) {
       case 'home':
-        return <Header title="如厕与饮水记录" leftAction={<Settings size={24} />} rightAction={<User size={24} />} />;
+        return <Header title="如厕与饮水记录" />;
       case 'records':
         return (
           <div className="sticky top-0 z-40 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
