@@ -1064,8 +1064,9 @@ export default function App() {
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
 
+        const labels = ['4周前', '3周前', '2周前', '上周', '本周'];
         const count = bowelActivities.filter(a => a.timestamp >= weekStart.getTime() && a.timestamp <= weekEnd.getTime()).length;
-        return { name: `第${i + 1}周`, value: count };
+        return { name: labels[i], value: count };
       });
     })();
 
