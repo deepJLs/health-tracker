@@ -350,6 +350,13 @@ const HomeView = ({
 };
 
 const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Activity[], heatmapData: { day: number, intensity: number }[], loading: boolean, key?: string }) => {
+  // Filter activities to only show today's records in the timeline
+  const todayActivities = React.useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return activities.filter(a => a.timestamp >= startOfToday.getTime());
+  }, [activities]);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 10 }}
@@ -363,9 +370,9 @@ const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Ac
           <LoadingSpinner />
         ) : (
           <div className="flex flex-col gap-8">
-            {activities.length === 0 ? (
-              <div className="text-center py-12 text-zinc-400">暂无记录</div>
-            ) : activities.map((activity, idx) => (
+            {todayActivities.length === 0 ? (
+              <div className="text-center py-12 text-zinc-400">今日暂无记录</div>
+            ) : todayActivities.map((activity, idx) => (
               <div key={activity.id} className="flex gap-4">
                 <div className="flex flex-col items-center">
                   <div className={cn(
@@ -374,7 +381,7 @@ const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Ac
                   )}>
                     {activity.type === 'bowel' ? <CheckCircle2 size={20} /> : <Droplets size={20} />}
                   </div>
-                  {idx !== activities.length - 1 && (
+                  {idx !== todayActivities.length - 1 && (
                     <div className="w-0.5 bg-zinc-200 dark:bg-zinc-800 h-12 mt-2" />
                   )}
                 </div>
