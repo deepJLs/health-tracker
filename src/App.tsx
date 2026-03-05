@@ -285,7 +285,7 @@ const HomeView = ({
       {/* Activity Summary */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-zinc-900 dark:text-zinc-100 text-lg font-bold">今日动态</h3>
+          <h3 className="text-zinc-900 dark:text-zinc-100 text-lg font-bold">近期动态</h3>
           <button
             onClick={onViewDetails}
             className="text-amber-500 text-sm font-semibold hover:underline"
@@ -319,7 +319,7 @@ const HomeView = ({
                       </button>
                     )}
                   </div>
-                  <span className="text-zinc-500 dark:text-zinc-400 text-xs">{activity.time}</span>
+                  <span className="text-zinc-500 dark:text-zinc-400 text-xs">{`${new Date(activity.timestamp).getMonth() + 1}/${new Date(activity.timestamp).getDate()} ${activity.time}`}</span>
                 </div>
                 <p className="text-zinc-500 dark:text-zinc-400 text-sm">{activity.detail}</p>
               </div>
