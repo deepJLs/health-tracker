@@ -350,12 +350,44 @@ const HomeView = ({
 };
 
 const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Activity[], heatmapData: { day: number, intensity: number }[], loading: boolean, key?: string }) => {
-  // Filter activities to only show today's records in the timeline
-  const todayActivities = React.useMemo(() => {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return activities.filter(a => a.timestamp >= startOfToday.getTime());
+  // Filter activities to show this week's records (Mon-Sun) in the timeline
+  const weekActivities = React.useMemo(() => {
+    const now = new Date();
+    const dow = now.getDay(); // 0=Sun
+    const mondayOffset = dow === 0 ? 6 : dow - 1;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    return activities.filter(a => a.timestamp >= weekStart.getTime() && a.timestamp <= weekEnd.getTime());
   }, [activities]);
+
+  // Group activities by date for display
+  const groupedByDate = React.useMemo(() => {
+    const groups: { date: string, label: string, activities: Activity[] }[] = [];
+    const dateMap = new Map<string, Activity[]>();
+    weekActivities.forEach(a => {
+      const d = new Date(a.timestamp);
+      const key = d.toDateString();
+      if (!dateMap.has(key)) dateMap.set(key, []);
+      dateMap.get(key)!.push(a);
+    });
+    const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    // Sort dates descending (most recent first)
+    const sortedKeys = Array.from(dateMap.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    sortedKeys.forEach(key => {
+      const d = new Date(key);
+      const today = new Date();
+      const isToday = d.toDateString() === today.toDateString();
+      const label = isToday
+        ? `今天 (${d.getMonth() + 1}/${d.getDate()} ${dayNames[d.getDay()]})`
+        : `${d.getMonth() + 1}/${d.getDate()} ${dayNames[d.getDay()]}`;
+      groups.push({ date: key, label, activities: dateMap.get(key)! });
+    });
+    return groups;
+  }, [weekActivities]);
 
   return (
     <motion.div
@@ -365,32 +397,43 @@ const RecordsView = ({ activities, heatmapData, loading, key }: { activities: Ac
       className="flex flex-col gap-6 p-4 pb-24"
     >
       <section>
-        <h3 className="text-zinc-900 dark:text-zinc-100 text-xl font-bold mb-6">今日时间轴</h3>
+        <h3 className="text-zinc-900 dark:text-zinc-100 text-xl font-bold mb-6">本周时间轴</h3>
         {loading ? (
           <LoadingSpinner />
         ) : (
-          <div className="flex flex-col gap-8">
-            {todayActivities.length === 0 ? (
-              <div className="text-center py-12 text-zinc-400">今日暂无记录</div>
-            ) : todayActivities.map((activity, idx) => (
-              <div key={activity.id} className="flex gap-4">
-                <div className="flex flex-col items-center">
-                  <div className={cn(
-                    "flex items-center justify-center size-10 rounded-full",
-                    activity.type === 'bowel' ? "bg-amber-500/20 text-amber-500" : "bg-blue-500/20 text-blue-500"
-                  )}>
-                    {activity.type === 'bowel' ? <CheckCircle2 size={20} /> : <Droplets size={20} />}
-                  </div>
-                  {idx !== todayActivities.length - 1 && (
-                    <div className="w-0.5 bg-zinc-200 dark:bg-zinc-800 h-12 mt-2" />
-                  )}
+          <div className="flex flex-col gap-6">
+            {weekActivities.length === 0 ? (
+              <div className="text-center py-12 text-zinc-400">本周暂无记录</div>
+            ) : groupedByDate.map((group) => (
+              <div key={group.date} className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                  <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 whitespace-nowrap">{group.label}</span>
+                  <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <p className="text-zinc-900 dark:text-zinc-100 font-semibold">{activity.title}</p>
-                    <p className="text-zinc-500 dark:text-zinc-400 text-sm">{activity.time}</p>
-                  </div>
-                  <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">{activity.detail}</p>
+                <div className="flex flex-col gap-8">
+                  {group.activities.map((activity, idx) => (
+                    <div key={activity.id} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          "flex items-center justify-center size-10 rounded-full",
+                          activity.type === 'bowel' ? "bg-amber-500/20 text-amber-500" : "bg-blue-500/20 text-blue-500"
+                        )}>
+                          {activity.type === 'bowel' ? <CheckCircle2 size={20} /> : <Droplets size={20} />}
+                        </div>
+                        {idx !== group.activities.length - 1 && (
+                          <div className="w-0.5 bg-zinc-200 dark:bg-zinc-800 h-12 mt-2" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <p className="text-zinc-900 dark:text-zinc-100 font-semibold">{activity.title}</p>
+                          <p className="text-zinc-500 dark:text-zinc-400 text-sm">{activity.time}</p>
+                        </div>
+                        <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">{activity.detail}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
